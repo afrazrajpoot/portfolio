@@ -18,10 +18,11 @@ export default function GallerySection({ items }) {
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [videoError, setVideoError] = useState(false);
-
+  console.log(items, "items reel");
   // Improved random column distribution with more variety
   const columnItems = useMemo(() => {
-    if (!items.length) return { leftCol: [], middleCol: [], rightCol: [] };
+    if (!items || !items.length)
+      return { leftCol: [], middleCol: [], rightCol: [] };
 
     // Shuffle items for random distribution
     const shuffledItems = [...items].sort(() => Math.random() - 0.5);
@@ -40,19 +41,22 @@ export default function GallerySection({ items }) {
 
   // GSAP Animations
   useEffect(() => {
+    if (!galleryRef.current) return;
+
     const ctx = gsap.context(() => {
       // Header animation
-      gsap.from(headerRef.current, {
-        opacity: 0,
-        y: 50,
-        duration: 1,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: headerRef.current,
-          start: "top 80%",
-          // toggleActions: "play none none reverse",
-        },
-      });
+      if (headerRef.current) {
+        gsap.from(headerRef.current, {
+          opacity: 0,
+          y: 50,
+          duration: 1,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: headerRef.current,
+            start: "top 80%",
+          },
+        });
+      }
 
       // Gallery items staggered animation
       const galleryItems = galleryRef.current.querySelectorAll(".gallery-item");
@@ -68,7 +72,6 @@ export default function GallerySection({ items }) {
           scrollTrigger: {
             trigger: item,
             start: "top 90%",
-            // toggleActions: "play none none reverse",
           },
           delay: (index % 3) * 0.1, // Stagger based on column
         });
@@ -82,17 +85,23 @@ export default function GallerySection({ items }) {
             ease: "power2.out",
           });
 
-          gsap.to(item.querySelector(".play-button"), {
-            scale: 1.2,
-            duration: 0.3,
-            ease: "back.out(1.7)",
-          });
+          const playButton = item.querySelector(".play-button");
+          if (playButton) {
+            gsap.to(playButton, {
+              scale: 1.2,
+              duration: 0.3,
+              ease: "back.out(1.7)",
+            });
+          }
 
-          gsap.to(item.querySelector("img"), {
-            scale: 1.1,
-            duration: 0.6,
-            ease: "power2.out",
-          });
+          const img = item.querySelector("img");
+          if (img) {
+            gsap.to(img, {
+              scale: 1.1,
+              duration: 0.6,
+              ease: "power2.out",
+            });
+          }
         });
 
         item.addEventListener("mouseleave", () => {
@@ -103,17 +112,23 @@ export default function GallerySection({ items }) {
             ease: "power2.out",
           });
 
-          gsap.to(item.querySelector(".play-button"), {
-            scale: 1,
-            duration: 0.3,
-            ease: "power2.out",
-          });
+          const playButton = item.querySelector(".play-button");
+          if (playButton) {
+            gsap.to(playButton, {
+              scale: 1,
+              duration: 0.3,
+              ease: "power2.out",
+            });
+          }
 
-          gsap.to(item.querySelector("img"), {
-            scale: 1,
-            duration: 0.6,
-            ease: "power2.out",
-          });
+          const img = item.querySelector("img");
+          if (img) {
+            gsap.to(img, {
+              scale: 1,
+              duration: 0.6,
+              ease: "power2.out",
+            });
+          }
         });
       });
     }, galleryRef);
@@ -155,8 +170,8 @@ export default function GallerySection({ items }) {
               Video Portfolio
             </h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-              Explore my creative work across {items.length}+ projects with
-              stunning visual storytelling
+              Explore my creative work across {items?.length || 0}+ projects
+              with stunning visual storytelling
             </p>
           </div>
 
@@ -169,7 +184,7 @@ export default function GallerySection({ items }) {
               <div key={colIndex} className="space-y-8 lg:space-y-10">
                 {column.map((item, itemIndex) => (
                   <DynamicGalleryItem
-                    key={item.id}
+                    key={item?.id || `${colIndex}-${itemIndex}`}
                     item={item}
                     index={colIndex * 10 + itemIndex}
                     onPlayClick={handleVideoPlay}
@@ -180,7 +195,7 @@ export default function GallerySection({ items }) {
           </div>
 
           <div className="text-center mt-16 text-gray-400 text-lg">
-            Displaying {items.length} curated projects
+            Displaying {items?.length || 0} curated projects
           </div>
         </div>
       </section>
@@ -222,7 +237,7 @@ export default function GallerySection({ items }) {
                 ) : selectedVideo ? (
                   <iframe
                     src={getYouTubeEmbedUrl(selectedVideo.videoUrl)}
-                    title={selectedVideo.title}
+                    title={selectedVideo.title || "Video"}
                     className="w-full h-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
@@ -234,6 +249,16 @@ export default function GallerySection({ items }) {
             </div>
 
             {/* Video Info - Positioned below video */}
+            {selectedVideo && (
+              <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg p-4 text-white">
+                <h3 className="text-xl font-bold mb-2">
+                  {selectedVideo.title || "Untitled Video"}
+                </h3>
+                <p className="text-gray-300">
+                  {selectedVideo.description || ""}
+                </p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -288,6 +313,17 @@ function getTypeColorClass(itemType) {
 
 // Gallery Item Component with Random Layout
 function DynamicGalleryItem({ item, index, onPlayClick }) {
+  // Safe data access with fallbacks
+  const safeItem = item || {};
+  const title = safeItem.title || "Untitled Project";
+  const category = safeItem.category || safeItem.type || "General";
+  const duration = safeItem.duration || "0:00";
+  const thumbnail =
+    safeItem.image || safeItem.thumbnail || "/placeholder-image.jpg";
+  const videoUrl = safeItem.videoUrl || safeItem.reelUrl || "";
+  const description = safeItem.description || "";
+  const tags = safeItem.tags || [];
+
   // More varied aspect ratios for random grid
   const aspectRatios = [
     { type: "vertical", class: "aspect-[3/4]" },
@@ -320,14 +356,25 @@ function DynamicGalleryItem({ item, index, onPlayClick }) {
       fitness: "from-lime-500/90 to-lime-600/90",
       educational: "from-teal-500/90 to-teal-600/90",
       event: "from-violet-500/90 to-violet-600/90",
+      entertainment: "from-purple-500/90 to-purple-600/90",
+      general: "from-gray-500/90 to-gray-600/90",
     };
-    return colors[itemType] || "from-purple-500/90 to-purple-600/90";
+    return (
+      colors[itemType?.toLowerCase()] || "from-purple-500/90 to-purple-600/90"
+    );
   };
 
   const handlePlayClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    onPlayClick(item);
+    if (videoUrl) {
+      onPlayClick({
+        ...safeItem,
+        videoUrl: videoUrl,
+        title: title,
+        description: description,
+      });
+    }
   };
 
   return (
@@ -339,11 +386,14 @@ function DynamicGalleryItem({ item, index, onPlayClick }) {
         className={`w-full ${currentAspect.class} relative overflow-hidden bg-gray-800`}
       >
         <img
-          src={item.thumbnail}
-          alt={item.title}
+          src={thumbnail}
+          alt={title}
           className="w-full h-full object-cover transition-transform duration-600"
           loading="lazy"
           decoding="async"
+          onError={(e) => {
+            e.target.src = "/placeholder-image.jpg";
+          }}
         />
       </div>
 
@@ -354,7 +404,7 @@ function DynamicGalleryItem({ item, index, onPlayClick }) {
             className="play-button w-16 h-16 lg:w-20 lg:h-20 rounded-full bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-lg border border-white/30 flex items-center justify-center shadow-2xl focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-300"
             variant="ghost"
             size="lg"
-            aria-label={`Play ${item.title}`}
+            aria-label={`Play ${title}`}
           >
             <Play className="w-6 h-6 lg:w-8 lg:h-8 text-white ml-1" />
           </Button>
@@ -364,17 +414,31 @@ function DynamicGalleryItem({ item, index, onPlayClick }) {
           <Badge
             variant="secondary"
             className={`mb-3 text-xs font-semibold bg-gradient-to-r ${getTypeColor(
-              item.type
+              category
             )} text-white backdrop-blur-sm border border-white/20`}
           >
-            {item.type.toUpperCase()}
+            {(category || "GENERAL").toUpperCase()}
           </Badge>
           <h3 className="text-2xl font-bold text-white mb-2 leading-tight">
-            {item.title}
+            {title}
           </h3>
           <p className="text-gray-300 text-sm font-medium">
-            {item.duration} • {item.views} views
+            {duration} • {safeItem.views || "0"} views
           </p>
+
+          {/* Tags */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {tags.slice(0, 3).map((tag, tagIndex) => (
+                <span
+                  key={tagIndex}
+                  className="bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
