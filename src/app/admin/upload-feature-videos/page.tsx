@@ -69,7 +69,7 @@ export default function VideoForm() {
     });
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = (e: any) => {
     const file = e.target.files[0];
     if (file) {
       // Validate file type
@@ -88,7 +88,7 @@ export default function VideoForm() {
 
       // Create preview
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = (e): any => {
         setImagePreview(e.target.result);
       };
       reader.readAsDataURL(file);
