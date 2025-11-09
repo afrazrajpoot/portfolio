@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import BioSection from "./components/BioSection";
 import VideoSlider from "./components/VideoSlider";
 import GallerySection from "./components/GallerySection";
@@ -7,20 +7,44 @@ import ContactSection from "./components/Contact";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { videoService } from "./services/dbServices";
 import { reelService } from "./services/reelServices";
-// import { reelService } from "./services/dbServices"; // Assuming reelService is exported from the same file or adjust path as needed
+import { galleryItems } from "./components/staticData";
+import type { GalleryItemType } from "./components/GallerySection"; // Adjust path if needed to import the type
 
 export default function VideoEditorPortfolio() {
   const [videos, setVideos] = useState([]);
-  const [reels, setReels] = useState([]);
+  const [reels, setReels] = useState<GalleryItemType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const LIMIT = 20;
+
+  const featuredVideosRef = useRef<HTMLDivElement>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  // In your page.tsx
-  // In your page.tsx
+  const scrollToSection = useCallback((section: string) => {
+    let targetRef: React.RefObject<HTMLDivElement> | null = null;
+    switch (section) {
+      case "features":
+      case "videos":
+        targetRef = featuredVideosRef;
+        break;
+      case "reels":
+        targetRef = galleryRef;
+        break;
+      default:
+        return;
+    }
+    const target = targetRef?.current;
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth" });
+    }
+  }, []);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -41,44 +65,65 @@ export default function VideoEditorPortfolio() {
       }));
       setVideos(transformedVideos);
 
-      // Fetch published reels for gallery - with better error handling
+      // Fetch initial published reels for gallery - paginated
       try {
-        const reelResponse = await reelService.getPublishedReels();
+        const params = { limit: LIMIT, offset: 0 };
+        const reelResponse = await reelService.getPublishedReels(params);
         const transformedReels = reelResponse.documents.map((doc) => ({
+          $id: doc.$id,
           id: doc.$id,
-          image: convertToViewUrl(doc.thumbnailUrl),
+          reelTitle: doc.reelTitle || "Untitled Reel",
           title: doc.reelTitle || "Untitled Reel",
+          image: convertToViewUrl(doc.thumbnailUrl),
+          thumbnailUrl: convertToViewUrl(doc.thumbnailUrl),
+          durationInSeconds: doc.durationInSeconds,
           duration: formatDuration(doc.durationInSeconds),
           tags: doc.tags || [],
           description: doc.description || "",
           category: doc.category || "entertainment",
+          type: doc.category || "entertainment",
           publishedDate: doc.publishedDate,
           videoUrl: doc.reelUrl,
+          reelUrl: doc.reelUrl,
+          views: doc.views || 0,
+          likes: doc.likes || 0,
         }));
         setReels(transformedReels);
+        setOffset(LIMIT);
+        setHasMore(reelResponse.documents.length === LIMIT);
       } catch (reelError) {
         console.error("Error fetching reels:", reelError);
-        // If published reels fail, try getting all reels
+        // Fallback: load all reels (non-paginated for simplicity)
         try {
           const allReelsResponse = await reelService.getAllReels();
           const publishedReels = allReelsResponse.documents.filter(
             (doc) => doc.isPublished === true
           );
           const transformedReels = publishedReels.map((doc) => ({
+            $id: doc.$id,
             id: doc.$id,
-            image: convertToViewUrl(doc.thumbnailUrl),
+            reelTitle: doc.reelTitle || "Untitled Reel",
             title: doc.reelTitle || "Untitled Reel",
+            image: convertToViewUrl(doc.thumbnailUrl),
+            thumbnailUrl: convertToViewUrl(doc.thumbnailUrl),
+            durationInSeconds: doc.durationInSeconds,
             duration: formatDuration(doc.durationInSeconds),
             tags: doc.tags || [],
             description: doc.description || "",
             category: doc.category || "entertainment",
+            type: doc.category || "entertainment",
             publishedDate: doc.publishedDate,
             videoUrl: doc.reelUrl,
+            reelUrl: doc.reelUrl,
+            views: doc.views || 0,
+            likes: doc.likes || 0,
           }));
           setReels(transformedReels);
+          setHasMore(false); // All loaded in fallback
         } catch (fallbackError) {
           console.error("Fallback also failed:", fallbackError);
-          setReels([]); // Set empty array if both methods fail
+          setReels([]);
+          setHasMore(false);
         }
       }
     } catch (err) {
@@ -88,6 +133,45 @@ export default function VideoEditorPortfolio() {
       setLoading(false);
     }
   };
+
+  const loadMoreReels = useCallback(async () => {
+    if (!hasMore || offset === 0) return;
+
+    try {
+      const params = { limit: LIMIT, offset };
+      const response = await reelService.getPublishedReels(params);
+      if (response.documents.length === 0) {
+        setHasMore(false);
+        return;
+      }
+
+      const newReels = response.documents.map((doc) => ({
+        $id: doc.$id,
+        id: doc.$id,
+        reelTitle: doc.reelTitle || "Untitled Reel",
+        title: doc.reelTitle || "Untitled Reel",
+        image: convertToViewUrl(doc.thumbnailUrl),
+        thumbnailUrl: convertToViewUrl(doc.thumbnailUrl),
+        durationInSeconds: doc.durationInSeconds,
+        duration: formatDuration(doc.durationInSeconds),
+        tags: doc.tags || [],
+        description: doc.description || "",
+        category: doc.category || "entertainment",
+        type: doc.category || "entertainment",
+        publishedDate: doc.publishedDate,
+        videoUrl: doc.reelUrl,
+        reelUrl: doc.reelUrl,
+        views: doc.views || 0,
+        likes: doc.likes || 0,
+      }));
+
+      setReels((prev) => [...prev, ...newReels]);
+      setOffset((prev) => prev + LIMIT);
+      setHasMore(response.documents.length === LIMIT);
+    } catch (error) {
+      console.error("Error loading more reels:", error);
+    }
+  }, [offset, hasMore]);
 
   // Helper function to convert preview URLs to view URLs
   const convertToViewUrl = (url) => {
@@ -136,9 +220,17 @@ export default function VideoEditorPortfolio() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
       <ScrollArea className="h-full w-full">
-        <BioSection />
-        <VideoSlider videos={videos} />
-        <GallerySection items={reels} />
+        <BioSection scrollToSection={scrollToSection} />
+        <div ref={featuredVideosRef}>
+          <VideoSlider videos={videos} />
+        </div>
+        <div ref={galleryRef}>
+          <GallerySection
+            items={reels}
+            loadMore={loadMoreReels}
+            hasMore={hasMore}
+          />
+        </div>
         <ContactSection />
       </ScrollArea>
     </div>

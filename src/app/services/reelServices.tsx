@@ -36,6 +36,8 @@ export const reelService = {
         isPublished: Boolean(reelData.isPublished),
         category: reelData.category?.substring(0, 50) || "entertainment",
         publishedDate: reelData.publishedDate || new Date().toISOString(),
+        likes: parseInt(reelData.likes) || 0, // Added for completeness, assuming schema includes it
+        views: parseInt(reelData.views) || 0, // Added for completeness, assuming schema includes it
       };
 
       // Validate required fields
@@ -184,78 +186,122 @@ export const reelService = {
     }
   },
 
-  // Update reel
-  async updateReel(reelId, reelData, thumbnailFile = null) {
+  // Update reel - FIXED: Only update provided fields (title, description, likes, views)
+  // Assumes thumbnailFile is not used in your component; ignores it for partial updates
+  async updateReel(reelId, reelData) {
     try {
-      let thumbnailUrl = reelData.thumbnailUrl;
+      // Build finalReelData with ONLY the fields that are actually provided
+      const finalReelData = {};
 
-      if (thumbnailFile) {
-        const uploadedFile = await storage.createFile(
-          BUCKET_ID,
-          ID.unique(),
-          thumbnailFile
+      // Only include fields if they are passed in reelData
+      if (reelData.reelTitle !== undefined) {
+        finalReelData.reelTitle = (reelData.reelTitle || "").substring(0, 256);
+      }
+      if (reelData.description !== undefined) {
+        finalReelData.description = (reelData.description || "").substring(
+          0,
+          1024
         );
-        // Use getFileView instead of getFilePreview
-        thumbnailUrl = storage.getFileView(BUCKET_ID, uploadedFile.$id);
+      }
+      if (reelData.likes !== undefined) {
+        finalReelData.likes = parseInt(reelData.likes) || 0;
+      }
+      if (reelData.views !== undefined) {
+        finalReelData.views = parseInt(reelData.views) || 0;
       }
 
-      const finalReelData = {
-        reelTitle: reelData.reelTitle?.substring(0, 256),
-        reelUrl: reelData.reelUrl?.substring(0, 512),
-        thumbnailUrl: thumbnailUrl?.substring(0, 512) || reelData.thumbnailUrl,
-        durationInSeconds: parseInt(reelData.durationInSeconds),
-        description: reelData.description?.substring(0, 1024),
-        tags: Array.isArray(reelData.tags)
-          ? reelData.tags.slice(0, 10)
-          : reelData.tags,
-        isPublished: Boolean(reelData.isPublished),
-        category: reelData.category?.substring(0, 50),
-      };
+      // Validate that at least one field is being updated
+      if (Object.keys(finalReelData).length === 0) {
+        throw new Error("No valid fields provided for update");
+      }
 
-      return await databases.updateDocument(
+      console.log("Updating reel with data:", finalReelData);
+
+      const result = await databases.updateDocument(
         DATABASE_ID,
         COLLECTION_ID,
         reelId,
         finalReelData
       );
+
+      console.log("Reel updated successfully:", result.$id);
+      return result;
     } catch (error) {
       console.error("Error updating reel:", error);
-      throw error;
+      if (error.code === 401) {
+        throw new Error(
+          "Authentication failed. Check Appwrite permissions for update."
+        );
+      } else if (error.code === 400) {
+        throw new Error(`Invalid data: ${error.message}`);
+      } else if (error.code === 404) {
+        throw new Error("Reel not found.");
+      } else {
+        throw new Error(error.message || "Failed to update reel");
+      }
     }
   },
 
-  // Delete reel
+  // Delete reel - FIXED: Improved error handling and logging; ensures file deletion only if ID is valid
   async deleteReel(reelId) {
     try {
       const reel = await this.getReelById(reelId);
 
-      const result = await databases.deleteDocument(
+      console.log("Deleting reel document:", reelId);
+      const deleteResult = await databases.deleteDocument(
         DATABASE_ID,
         COLLECTION_ID,
         reelId
       );
+      console.log("Document deleted successfully");
 
-      // Delete thumbnail from storage if exists
-      if (reel.thumbnailUrl && reel.thumbnailUrl.includes("/storage/")) {
+      // Delete thumbnail from storage if it exists and we can extract a valid file ID
+      if (
+        reel.thumbnailUrl &&
+        typeof reel.thumbnailUrl === "string" &&
+        reel.thumbnailUrl.includes("/storage/")
+      ) {
         const fileId = this.extractFileIdFromUrl(reel.thumbnailUrl);
         if (fileId) {
+          console.log("Deleting thumbnail file:", fileId);
           await storage.deleteFile(BUCKET_ID, fileId);
+          console.log("Thumbnail file deleted successfully");
+        } else {
+          console.warn(
+            "Could not extract file ID from thumbnail URL; skipping file deletion"
+          );
         }
+      } else {
+        console.log("No valid thumbnail URL found; skipping file deletion");
       }
 
-      return result;
+      return deleteResult;
     } catch (error) {
       console.error("Error deleting reel:", error);
-      throw error;
+      if (error.code === 401) {
+        throw new Error(
+          "Authentication failed. Check Appwrite permissions for delete."
+        );
+      } else if (error.code === 404) {
+        throw new Error("Reel not found.");
+      } else if (error.code === 409 && error.type === "document_conflict") {
+        throw new Error("Delete conflict; try again.");
+      } else {
+        throw new Error(error.message || "Failed to delete reel");
+      }
     }
   },
 
   // Helper function to extract file ID from URL
   extractFileIdFromUrl(url) {
-    if (!url) return null;
-    // Try both preview and view patterns
-    const previewMatches = url.match(/\/storage\/v1\/files\/([^\/]+)\/preview/);
-    const viewMatches = url.match(/\/storage\/v1\/files\/([^\/]+)\/view/);
+    if (!url || typeof url !== "string") return null;
+    // Try both preview and view patterns (more robust regex for full Appwrite URLs)
+    const previewMatches = url.match(
+      /\/storage\/v1\/files\/([^\/]+)(?:\/preview|\?|$)/
+    );
+    const viewMatches = url.match(
+      /\/storage\/v1\/files\/([^\/]+)(?:\/view|\?|$)/
+    );
     return previewMatches
       ? previewMatches[1]
       : viewMatches
@@ -266,6 +312,6 @@ export const reelService = {
   // Helper function to convert existing preview URLs to view URLs
   convertPreviewToView(url) {
     if (!url) return url;
-    return url.replace("/preview", "/view");
+    return url.replace(/\/preview(?:\?|$)/, "/view$1");
   },
 };

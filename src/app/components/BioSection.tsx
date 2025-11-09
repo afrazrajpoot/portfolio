@@ -1,7 +1,19 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ExternalLink, Linkedin, Instagram, Phone } from "lucide-react"; // Assuming lucide-react for icons; install if needed: npm i lucide-react
+import {
+  ExternalLink,
+  Linkedin,
+  Instagram,
+  Phone,
+  Menu,
+  X,
+  Search,
+  Film,
+  Star,
+  Video,
+  DollarSign,
+} from "lucide-react"; // Added more icons
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -10,7 +22,11 @@ if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-export default function BioSection() {
+interface BioSectionProps {
+  scrollToSection?: (section: string) => void;
+}
+
+export default function BioSection({ scrollToSection }: BioSectionProps) {
   const bioRef = useRef(null);
   const avatarRef = useRef(null);
   const nameRef = useRef(null);
@@ -18,7 +34,18 @@ export default function BioSection() {
   const descriptionRef = useRef(null);
   const skillsRef = useRef(null);
   const statsRef = useRef(null);
-  const contactRef = useRef(null); // New ref for contact section animations
+  const contactRef = useRef(null);
+  const mobileMenuRef = useRef(null); // New ref for mobile menu
+
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+  };
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -121,7 +148,7 @@ export default function BioSection() {
         "-=0.5"
       );
 
-      // New: Contact section animation
+      // Contact section animation
       tl.from(
         contactRef.current.querySelectorAll(".contact-link"),
         {
@@ -134,30 +161,6 @@ export default function BioSection() {
         },
         "-=0.3"
       );
-
-      // Continuous floating animation for avatar
-      gsap.to(avatarRef.current, {
-        y: -20,
-        duration: 3,
-        ease: "sine.inOut",
-        repeat: -1,
-        yoyo: true,
-      });
-
-      // Rotating glow orbs
-      gsap.to(".glow-orb-1", {
-        rotation: 360,
-        duration: 20,
-        ease: "none",
-        repeat: -1,
-      });
-
-      gsap.to(".glow-orb-2", {
-        rotation: -360,
-        duration: 15,
-        ease: "none",
-        repeat: -1,
-      });
 
       // Skill badges hover animations
       const badges = skillsRef.current.querySelectorAll(".skill-badge");
@@ -215,7 +218,7 @@ export default function BioSection() {
         });
       });
 
-      // New: Contact links hover animations
+      // Contact links hover animations
       const contactLinks = contactRef.current.querySelectorAll(".contact-link");
       contactLinks.forEach((link) => {
         link.addEventListener("mouseenter", () => {
@@ -267,10 +270,28 @@ export default function BioSection() {
       animateNumber(statNumbers[0], 150);
       animateNumber(statNumbers[1], 50);
       animateNumber(statNumbers[2], 12);
-    }, bioRef);
+
+      // Menu slide-down animation
+      if (mobileMenuRef.current) {
+        if (isMenuOpen) {
+          gsap.fromTo(
+            mobileMenuRef.current,
+            { y: -100, opacity: 0 },
+            { y: 0, opacity: 1, duration: 0.6, ease: "back.out(1.7)" }
+          );
+        } else {
+          gsap.to(mobileMenuRef.current, {
+            y: -100,
+            opacity: 0,
+            duration: 0.4,
+            ease: "power2.in",
+          });
+        }
+      }
+    }, [isMenuOpen, bioRef]); // Add isMenuOpen dependency
 
     return () => ctx.revert();
-  }, []);
+  }, [isMenuOpen]);
 
   // Placeholder links - replace with your actual URLs/phone number
   const LINKEDIN_URL = "https://linkedin.com/in/alexmorrison";
@@ -281,164 +302,240 @@ export default function BioSection() {
     ""
   )}`;
 
+  // Navigation links
+  const navItems = [
+    { name: "Reels", href: "/reels", icon: Film },
+    { name: "Features", href: "/features", icon: Star },
+    { name: "Videos", href: "/videos", icon: Video },
+    { name: "Pricing", href: "/pricing", icon: DollarSign },
+  ];
+
+  const handleMenuItemClick = (name: string) => {
+    if (name === "Pricing") {
+      // External navigation
+      window.location.href = "/pricing";
+    } else {
+      // Internal scroll
+      scrollToSection?.(name.toLowerCase());
+    }
+    closeMenu();
+  };
+
   return (
-    <section ref={bioRef} className="min-h-screen flex items-center">
-      <div className="w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-screen">
-          {/* Left Column - Image */}
-          <div className="flex items-center justify-center min-h-screen">
-            <div ref={avatarRef} className="relative">
-              <div className="profile-avatar w-96 h-96 rounded-3xl bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 p-[4px] shadow-2xl">
-                <div className="w-full h-full rounded-3xl bg-gray-900 flex items-center justify-center overflow-hidden">
-                  <span className="text-[12rem]">🎬</span>
-                </div>
-              </div>
-              <div className="glow-orb glow-orb-1 absolute -bottom-8 -right-8 w-40 h-40 bg-gradient-to-br from-purple-500/30 to-pink-500/30 rounded-full blur-3xl"></div>
-              <div className="glow-orb glow-orb-2 absolute -top-8 -left-8 w-32 h-32 bg-gradient-to-br from-pink-500/30 to-purple-500/30 rounded-full blur-3xl"></div>
+    <>
+      {/* Transparent Burger Menu Icon - Fixed Position on Left Side */}
+      <button
+        onClick={toggleMenu}
+        className="fixed top-4 left-4 z-50 flex flex-col justify-center gap-1 p-2 transition-all"
+      >
+        <span
+          className={`w-6 h-0.5 bg-white transition-transform duration-300 ${
+            isMenuOpen ? "rotate-45 translate-y-1.5" : ""
+          }`}
+        ></span>
+        <span
+          className={`w-6 h-0.5 bg-white transition-opacity duration-300 ${
+            isMenuOpen ? "opacity-0" : ""
+          }`}
+        ></span>
+        <span
+          className={`w-6 h-0.5 bg-white transition-transform duration-300 ${
+            isMenuOpen ? "-rotate-45 -translate-y-1.5" : ""
+          }`}
+        ></span>
+      </button>
+
+      {/* Full-Screen Menu Overlay - Always full screen on click */}
+      {isMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-gray-900/95 backdrop-blur-md flex flex-col">
+          <div
+            ref={mobileMenuRef}
+            className="flex-1 flex flex-col items-center justify-center space-y-8 pt-8"
+          >
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => handleMenuItemClick(item.name)}
+                  className="flex items-center gap-3 px-6 py-3 text-2xl font-semibold text-gray-300 hover:text-purple-400 transition-colors rounded-xl bg-gray-800/30"
+                >
+                  <Icon className="w-6 h-6" />
+                  {item.name}
+                </button>
+              );
+            })}
+            {/* Search Bar */}
+            <div className="flex items-center bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-3 w-4/5 max-w-lg">
+              <Search className="w-5 h-5 text-gray-400 mr-3" />
+              <input
+                type="text"
+                placeholder="Search projects..."
+                className="bg-transparent text-gray-300 outline-none flex-1 text-lg"
+              />
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Right Column - Description & Skills */}
-          <div className="flex items-center px-8 md:px-16 lg:px-20 py-20">
-            <div className="max-w-2xl">
-              <h1
-                ref={nameRef}
-                className="text-5xl md:text-6xl lg:text-7xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-pink-500 to-purple-400 bg-clip-text text-transparent tracking-tight"
-              >
-                Alex Morrison
-              </h1>
-              <p
-                ref={titleRef}
-                className="text-xl md:text-2xl text-gray-300 font-light tracking-wide mb-8"
-              >
-                Award-Winning Video Editor & Storyteller
-              </p>
-
-              <div ref={descriptionRef}>
-                <p className="text-lg text-gray-300 leading-relaxed mb-4">
-                  With over 8 years of experience in professional video editing,
-                  I specialize in crafting compelling visual narratives that
-                  captivate audiences and elevate brands.
-                </p>
-                <p className="text-base text-gray-400 leading-relaxed mb-8">
-                  From corporate films and commercials to music videos and
-                  documentaries, I bring stories to life through expert editing,
-                  color grading, and motion graphics.
-                </p>
-              </div>
-
-              {/* Skills */}
-              <div ref={skillsRef} className="mb-8">
-                <h3 className="text-xl font-semibold text-gray-200 mb-4">
-                  Core Skills
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  <Badge
-                    variant="secondary"
-                    className="skill-badge bg-purple-500/20 border-purple-500/40 text-purple-300 cursor-pointer"
-                  >
-                    Adobe Premiere Pro
-                  </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="skill-badge bg-pink-500/20 border-pink-500/40 text-pink-300 cursor-pointer"
-                  >
-                    DaVinci Resolve
-                  </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="skill-badge bg-purple-500/20 border-purple-500/40 text-purple-300 cursor-pointer"
-                  >
-                    After Effects
-                  </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="skill-badge bg-pink-500/20 border-pink-500/40 text-pink-300 cursor-pointer"
-                  >
-                    Color Grading
-                  </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="skill-badge bg-purple-500/20 border-purple-500/40 text-purple-300 cursor-pointer"
-                  >
-                    Motion Graphics
-                  </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="skill-badge bg-pink-500/20 border-pink-500/40 text-pink-300 cursor-pointer"
-                  >
-                    Sound Design
-                  </Badge>
+      <section ref={bioRef} className="min-h-screen flex items-center">
+        <div className="w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 min-h-screen">
+            {/* Left Column - Image */}
+            <div className="flex items-center justify-center min-h-screen">
+              <div ref={avatarRef} className="relative">
+                <div className="profile-avatar w-96 h-96 rounded-3xl bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 p-[4px] shadow-2xl">
+                  <div className="w-full h-full rounded-3xl bg-gray-900 flex items-center justify-center overflow-hidden">
+                    <span className="text-[12rem]">🎬</span>
+                  </div>
                 </div>
+                <div className="glow-orb glow-orb-1 absolute -bottom-8 -right-8 w-40 h-40 bg-gradient-to-br from-purple-500/30 to-pink-500/30 rounded-full blur-3xl"></div>
+                <div className="glow-orb glow-orb-2 absolute -top-8 -left-8 w-32 h-32 bg-gradient-to-br from-pink-500/30 to-purple-500/30 rounded-full blur-3xl"></div>
               </div>
+            </div>
 
-              {/* Stats */}
-              <div ref={statsRef} className="grid grid-cols-3 gap-4 mb-8">
-                <Card className="stat-card bg-gray-800/40 backdrop-blur-sm border-gray-700/50 cursor-pointer">
-                  <CardContent className="p-4 text-center">
-                    <div className="stat-number text-3xl font-bold bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent mb-1">
-                      0+
-                    </div>
-                    <div className="text-sm text-gray-300">Projects</div>
-                  </CardContent>
-                </Card>
-                <Card className="stat-card bg-gray-800/40 backdrop-blur-sm border-gray-700/50 cursor-pointer">
-                  <CardContent className="p-4 text-center">
-                    <div className="stat-number text-3xl font-bold bg-gradient-to-r from-pink-400 to-pink-600 bg-clip-text text-transparent mb-1">
-                      0+
-                    </div>
-                    <div className="text-sm text-gray-300">Clients</div>
-                  </CardContent>
-                </Card>
-                <Card className="stat-card bg-gray-800/40 backdrop-blur-sm border-gray-700/50 cursor-pointer">
-                  <CardContent className="p-4 text-center">
-                    <div className="stat-number text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent mb-1">
-                      0
-                    </div>
-                    <div className="text-sm text-gray-300">Awards</div>
-                  </CardContent>
-                </Card>
-              </div>
+            {/* Right Column - Description & Skills */}
+            <div className="flex items-center px-8 md:px-16 lg:px-20 py-20">
+              <div className="max-w-2xl">
+                <h1
+                  ref={nameRef}
+                  className="text-5xl md:text-6xl lg:text-7xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-pink-500 to-purple-400 bg-clip-text text-transparent tracking-tight"
+                >
+                  Alex Morrison
+                </h1>
+                <p
+                  ref={titleRef}
+                  className="text-xl md:text-2xl text-gray-300 font-light tracking-wide mb-8"
+                >
+                  Award-Winning Video Editor & Storyteller
+                </p>
 
-              {/* New: Contact Section */}
-              <div ref={contactRef}>
-                <h3 className="text-xl font-semibold text-gray-200 mb-4">
-                  Let's Connect
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  <a
-                    href={LINKEDIN_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="contact-link inline-flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/40 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-colors cursor-pointer"
-                  >
-                    <Linkedin className="w-4 h-4" />
-                    LinkedIn
-                  </a>
-                  <a
-                    href={INSTAGRAM_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="contact-link inline-flex items-center gap-2 px-4 py-2 bg-pink-500/20 border border-pink-500/40 text-pink-300 rounded-lg hover:bg-pink-500/30 transition-colors cursor-pointer"
-                  >
-                    <Instagram className="w-4 h-4" />
-                    Instagram
-                  </a>
-                  <a
-                    href={WHATSAPP_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="contact-link inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 border border-green-500/40 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors cursor-pointer"
-                  >
-                    <Phone className="w-4 h-4" />
-                    WhatsApp
-                  </a>
+                <div ref={descriptionRef}>
+                  <p className="text-lg text-gray-300 leading-relaxed mb-4">
+                    With over 8 years of experience in professional video
+                    editing, I specialize in crafting compelling visual
+                    narratives that captivate audiences and elevate brands.
+                  </p>
+                  <p className="text-base text-gray-400 leading-relaxed mb-8">
+                    From corporate films and commercials to music videos and
+                    documentaries, I bring stories to life through expert
+                    editing, color grading, and motion graphics.
+                  </p>
+                </div>
+
+                {/* Skills */}
+                <div ref={skillsRef} className="mb-8">
+                  <h3 className="text-xl font-semibold text-gray-200 mb-4">
+                    Core Skills
+                  </h3>
+                  <div className="flex flex-wrap gap-3">
+                    <Badge
+                      variant="secondary"
+                      className="skill-badge bg-purple-500/20 border-purple-500/40 text-purple-300 cursor-pointer"
+                    >
+                      Adobe Premiere Pro
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="skill-badge bg-pink-500/20 border-pink-500/40 text-pink-300 cursor-pointer"
+                    >
+                      DaVinci Resolve
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="skill-badge bg-purple-500/20 border-purple-500/40 text-purple-300 cursor-pointer"
+                    >
+                      After Effects
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="skill-badge bg-pink-500/20 border-pink-500/40 text-pink-300 cursor-pointer"
+                    >
+                      Color Grading
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="skill-badge bg-purple-500/20 border-purple-500/40 text-purple-300 cursor-pointer"
+                    >
+                      Motion Graphics
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="skill-badge bg-pink-500/20 border-pink-500/40 text-pink-300 cursor-pointer"
+                    >
+                      Sound Design
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div ref={statsRef} className="grid grid-cols-3 gap-4 mb-8">
+                  <Card className="stat-card bg-gray-800/40 backdrop-blur-sm border-gray-700/50 cursor-pointer">
+                    <CardContent className="p-4 text-center">
+                      <div className="stat-number text-3xl font-bold bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent mb-1">
+                        0+
+                      </div>
+                      <div className="text-sm text-gray-300">Projects</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="stat-card bg-gray-800/40 backdrop-blur-sm border-gray-700/50 cursor-pointer">
+                    <CardContent className="p-4 text-center">
+                      <div className="stat-number text-3xl font-bold bg-gradient-to-r from-pink-400 to-pink-600 bg-clip-text text-transparent mb-1">
+                        0+
+                      </div>
+                      <div className="text-sm text-gray-300">Clients</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="stat-card bg-gray-800/40 backdrop-blur-sm border-gray-700/50 cursor-pointer">
+                    <CardContent className="p-4 text-center">
+                      <div className="stat-number text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent mb-1">
+                        0
+                      </div>
+                      <div className="text-sm text-gray-300">Awards</div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Contact Section */}
+                <div ref={contactRef}>
+                  <h3 className="text-xl font-semibold text-gray-200 mb-4">
+                    Let's Connect
+                  </h3>
+                  <div className="flex flex-wrap gap-3">
+                    <a
+                      href={LINKEDIN_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="contact-link inline-flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/40 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-colors cursor-pointer"
+                    >
+                      <Linkedin className="w-4 h-4" />
+                      LinkedIn
+                    </a>
+                    <a
+                      href={INSTAGRAM_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="contact-link inline-flex items-center gap-2 px-4 py-2 bg-pink-500/20 border border-pink-500/40 text-pink-300 rounded-lg hover:bg-pink-500/30 transition-colors cursor-pointer"
+                    >
+                      <Instagram className="w-4 h-4" />
+                      Instagram
+                    </a>
+                    <a
+                      href={WHATSAPP_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="contact-link inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 border border-green-500/40 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors cursor-pointer"
+                    >
+                      <Phone className="w-4 h-4" />
+                      WhatsApp
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
